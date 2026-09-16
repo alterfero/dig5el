@@ -3,7 +3,7 @@ import handler from "vinext/server/app-router-entry";
 import { readyHealthResponse, liveHealthResponse } from "../server/health";
 import { apiError, createRequestId, withRequestId } from "../server/http";
 import { createLogger } from "../server/logger";
-import type { RuntimeBindings } from "../server/runtime-env";
+import { inspectRuntimeEnv, type RuntimeBindings } from "../server/runtime-env";
 
 type AssetBinding = {
   fetch(request: Request): Promise<Response>;
@@ -27,12 +27,28 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+/**
+ * Only the Worker may create this header from a validated configured origin.
+ * It replaces any client-supplied value before App Router metadata is rendered.
+ */
+function withTrustedAppOrigin(request: Request, appOrigin: URL | null): Request {
+  if (!appOrigin || (request.method !== "GET" && request.method !== "HEAD")) {
+    return request;
+  }
+
+  const headers = new Headers(request.headers);
+  headers.delete("x-dig4el-app-origin");
+  headers.set("x-dig4el-app-origin", appOrigin.origin);
+  return new Request(request, { headers });
+}
+
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const requestId = createRequestId();
     const startedAt = Date.now();
     const logger = createLogger(env.DIG4EL_LOG_LEVEL);
+    const runtime = inspectRuntimeEnv(env);
 
     try {
       let response: Response;
@@ -56,7 +72,14 @@ const worker = {
           },
         }, allowedWidths);
       } else {
-        response = await handler.fetch(request, env, ctx);
+        response = await handler.fetch(
+          withTrustedAppOrigin(
+            request,
+            runtime.ready ? runtime.config.appOrigin : null,
+          ),
+          env,
+          ctx,
+        );
       }
 
       logger.info("request.completed", {

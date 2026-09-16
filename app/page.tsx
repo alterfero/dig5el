@@ -4,13 +4,19 @@ import { ApplicationShell } from "../components/application-shell";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
-  const host =
-    requestHeaders.get("x-forwarded-host") ??
-    requestHeaders.get("host") ??
-    "localhost:3000";
-  const protocol =
-    requestHeaders.get("x-forwarded-proto") === "http" ? "http" : "https";
-  const socialImage = `${protocol}://${host}/og.png`;
+  const trustedOrigin = requestHeaders.get("x-dig4el-app-origin");
+  let socialImage = "/og.png";
+
+  if (trustedOrigin) {
+    try {
+      const origin = new URL(trustedOrigin);
+      if (origin.protocol === "https:") {
+        socialImage = new URL("/og.png", origin).toString();
+      }
+    } catch {
+      // The Worker does not supply malformed values. Keep a safe local fallback.
+    }
+  }
 
   return {
     title: "DIG4EL — language documentation, made welcoming",

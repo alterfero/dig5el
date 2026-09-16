@@ -44,4 +44,10 @@ describe("runtime configuration", () => {
       }),
     ).toEqual({ ready: false });
   });
+
+  it("requires an explicit runtime environment", () => {
+    expect(inspectRuntimeEnv({ PLAID_AUTH_MODE: "disabled" })).toEqual({
+      ready: false,
+    });
+  });
 });

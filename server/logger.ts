@@ -16,7 +16,8 @@ type LogWriter = (level: Exclude<LogLevel, "silent">, record: ServerLogRecord) =
 
 const redacted = "[REDACTED]";
 const omitted = "[OMITTED]";
-const sensitiveKey = /authorization|cookie|password|token|secret|api[-_]?key|credential|session|body/i;
+const sensitiveKey =
+  /authorization|cookie|password|token|secret|api[-_]?key|credential|session|body|prompt|corpus|transcript|input|message|detail/i;
 
 const levelWeight: Record<LogLevel, number> = {
   debug: 10,

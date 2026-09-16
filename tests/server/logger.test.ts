@@ -7,6 +7,7 @@ describe("structured server logging", () => {
     const record = redactForLog({
       authorization: secret,
       body: { prompt: "private corpus text" },
+      prompt: "private elicitation answer",
       nested: { cookie: "session=private" },
       error: new Error("private upstream failure"),
     });
@@ -15,9 +16,11 @@ describe("structured server logging", () => {
     expect(serialized).not.toContain(secret);
     expect(serialized).not.toContain("private corpus text");
     expect(serialized).not.toContain("private upstream failure");
+    expect(serialized).not.toContain("private elicitation answer");
     expect(record).toEqual({
       authorization: "[REDACTED]",
       body: "[REDACTED]",
+      prompt: "[REDACTED]",
       nested: { cookie: "[REDACTED]" },
       error: { name: "Error" },
     });

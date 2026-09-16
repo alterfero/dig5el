@@ -56,4 +56,13 @@ describe("health endpoints", () => {
     });
     expect(JSON.stringify(payload)).not.toContain("unsafe.test");
   });
+
+  it("fails readiness closed when an environment is absent", async () => {
+    const response = readyHealthResponse({ PLAID_AUTH_MODE: "disabled" }, "req_missing");
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { status: "degraded" },
+    });
+  });
 });

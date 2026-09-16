@@ -3,14 +3,17 @@ import test from "node:test";
 
 const secret = "never-leak-plaid-service-token";
 
-async function fetchWorker(path) {
+async function fetchWorker(path, options = {}) {
   const workerUrl = new URL("../../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${path}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
     new Request(`http://localhost${path}`, {
-      headers: { accept: path.startsWith("/api/") ? "application/json" : "text/html" },
+      headers: {
+        accept: path.startsWith("/api/") ? "application/json" : "text/html",
+        ...options.headers,
+      },
     }),
     {
       ASSETS: {
@@ -18,6 +21,7 @@ async function fetchWorker(path) {
       },
       DIG4EL_ENVIRONMENT: "development",
       DIG4EL_LOG_LEVEL: "silent",
+      DIG4EL_APP_ORIGIN: options.appOrigin,
       PLAID_AUTH_MODE: "disabled",
       PLAID_SERVICE_TOKEN: secret,
     },
@@ -65,4 +69,15 @@ test("unknown API routes retain the safe error envelope", async () => {
   assert.equal(body.error.code, "NOT_FOUND");
   assert.equal(body.error.retryable, false);
   assert.doesNotMatch(JSON.stringify(body), new RegExp(secret));
+});
+
+test("trusted social metadata ignores a hostile forwarded host", async () => {
+  const response = await fetchWorker("/", {
+    appOrigin: "https://dig4el.example.test",
+    headers: { "x-forwarded-host": "attacker.invalid" },
+  });
+  const html = await response.text();
+
+  assert.match(html, /https:\/\/dig4el\.example\.test\/og\.png/);
+  assert.doesNotMatch(html, /attacker\.invalid\/og\.png/);
 });

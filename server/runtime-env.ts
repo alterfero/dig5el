@@ -101,13 +101,13 @@ function isThirtyTwoByteKey(value: string): boolean {
  */
 export function validateRuntimeEnv(bindings: RuntimeBindings): ServerRuntimeConfig {
   const issues: string[] = [];
-  const environmentValue = configured(bindings.DIG4EL_ENVIRONMENT) ?? "development";
-  const environment = environments.has(environmentValue as Dig4elEnvironment)
+  const environmentValue = configured(bindings.DIG4EL_ENVIRONMENT);
+  const environment = environmentValue && environments.has(environmentValue as Dig4elEnvironment)
     ? (environmentValue as Dig4elEnvironment)
     : null;
 
   if (!environment) {
-    issues.push("DIG4EL_ENVIRONMENT must be development, test, staging, or production.");
+    issues.push("DIG4EL_ENVIRONMENT must be explicitly set to a recognized environment.");
   }
 
   const logLevelValue = configured(bindings.DIG4EL_LOG_LEVEL) ?? "info";
@@ -124,8 +124,9 @@ export function validateRuntimeEnv(bindings: RuntimeBindings): ServerRuntimeConf
   }
 
   const resolvedEnvironment = environment ?? "development";
+  const appOriginValue = configured(bindings.DIG4EL_APP_ORIGIN);
   const appOrigin = parsePinnedOrigin(
-    configured(bindings.DIG4EL_APP_ORIGIN),
+    appOriginValue,
     "DIG4EL_APP_ORIGIN",
     resolvedEnvironment,
     issues,
@@ -138,6 +139,13 @@ export function validateRuntimeEnv(bindings: RuntimeBindings): ServerRuntimeConf
   );
   const sessionEncryptionKey = configured(bindings.SESSION_ENCRYPTION_KEY);
   const plaidServiceToken = configured(bindings.PLAID_SERVICE_TOKEN);
+
+  if (
+    (resolvedEnvironment === "staging" || resolvedEnvironment === "production") &&
+    !appOriginValue
+  ) {
+    issues.push("DIG4EL_APP_ORIGIN is required outside local development.");
+  }
 
   if (sessionEncryptionKey && !isThirtyTwoByteKey(sessionEncryptionKey)) {
     issues.push("SESSION_ENCRYPTION_KEY must encode exactly 32 bytes.");
