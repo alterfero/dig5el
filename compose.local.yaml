@@ -1,0 +1,21 @@
+# Optional local PostgreSQL for development. It is not required when using an
+# already-running PostgreSQL service on the developer's computer.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dig4el
+      POSTGRES_PASSWORD: dig4el-local-password
+      POSTGRES_USER: dig4el
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dig4el -d dig4el"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - dig4el_postgres:/var/lib/postgresql/data
+
+volumes:
+  dig4el_postgres:

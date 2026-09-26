@@ -50,4 +50,28 @@ describe("runtime configuration", () => {
       ready: false,
     });
   });
+
+  it("fails closed when a production Node process is labelled development", () => {
+    expect(() =>
+      validateRuntimeEnv({
+        DIG4EL_ENVIRONMENT: "development",
+        NODE_ENV: "production",
+        PLAID_AUTH_MODE: "disabled",
+      }),
+    ).toThrow(RuntimeConfigError);
+  });
+
+  it("allows production local auth because administrators issue codes directly", () => {
+    const config = validateRuntimeEnv({
+      DATABASE_URL: "postgresql://user:password@db.example.test:5432/dig4el",
+      DIG4EL_APP_ORIGIN: "https://dig4el.example.test",
+      DIG4EL_AUTH_MODE: "local-password",
+      DIG4EL_ENVIRONMENT: "production",
+      NODE_ENV: "production",
+      PLAID_AUTH_MODE: "disabled",
+      SESSION_ENCRYPTION_KEY: "d".repeat(64),
+    });
+
+    expect(config.dig4elAuthMode).toBe("local-password");
+  });
 });

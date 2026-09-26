@@ -1,4 +1,5 @@
 import { apiSuccess } from "./http";
+import { getLocalAuthRuntime } from "./auth/auth-runtime";
 import { inspectRuntimeEnv, type RuntimeBindings } from "./runtime-env";
 
 export const applicationVersion = "0.1.0";
@@ -11,28 +12,79 @@ export function liveHealthResponse(requestId: string): Response {
 }
 
 /**
- * This foundation has no local database or session store yet. Future adapters
- * can make them required dependencies without exposing their diagnostics here.
+ * Readiness intentionally exposes dependency state, not connection strings,
+ * database errors, or account data. When local auth is enabled it verifies the
+ * authentication and local-administration schema rather than treating a
+ * valid-looking URL as ready.
  */
-export function readyHealthResponse(
+export async function readyHealthResponse(
   bindings: RuntimeBindings,
   requestId: string,
-): Response {
+): Promise<Response> {
   const runtime = inspectRuntimeEnv(bindings);
-  const ready = runtime.ready;
-
-  return apiSuccess(
-    {
-      status: ready ? "ready" : "degraded",
-      service: "dig4el",
-      version: applicationVersion,
-      dependencies: {
-        configuration: ready ? "ready" : "degraded",
-        localPersistence: "not-configured",
-        plaidProbe: "not-run",
+  if (!runtime.ready) {
+    return apiSuccess(
+      {
+        status: "degraded",
+        service: "dig4el",
+        version: applicationVersion,
+        dependencies: {
+          configuration: "degraded",
+          localPersistence: "not-configured",
+          plaidProbe: "not-run",
+        },
       },
-    },
-    requestId,
-    ready ? 200 : 503,
-  );
+      requestId,
+      503,
+    );
+  }
+
+  if (runtime.config.dig4elAuthMode !== "local-password") {
+    return apiSuccess(
+      {
+        status: "ready",
+        service: "dig4el",
+        version: applicationVersion,
+        dependencies: {
+          configuration: "ready",
+          localPersistence: "not-configured",
+          plaidProbe: "not-run",
+        },
+      },
+      requestId,
+    );
+  }
+
+  try {
+    const auth = getLocalAuthRuntime(bindings);
+    await auth.persistence.store.ping();
+    return apiSuccess(
+      {
+        status: "ready",
+        service: "dig4el",
+        version: applicationVersion,
+        dependencies: {
+          configuration: "ready",
+          localPersistence: auth.persistence.persistent ? "ready" : "development-only",
+          plaidProbe: "not-run",
+        },
+      },
+      requestId,
+    );
+  } catch {
+    return apiSuccess(
+      {
+        status: "degraded",
+        service: "dig4el",
+        version: applicationVersion,
+        dependencies: {
+          configuration: "ready",
+          localPersistence: "degraded",
+          plaidProbe: "not-run",
+        },
+      },
+      requestId,
+      503,
+    );
+  }
 }

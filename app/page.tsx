@@ -1,22 +1,11 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { ApplicationShell } from "../components/application-shell";
+import { metadataBaseFor } from "../server/metadata-base";
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const trustedOrigin = requestHeaders.get("x-dig4el-app-origin");
-  let socialImage = "/og.png";
-
-  if (trustedOrigin) {
-    try {
-      const origin = new URL(trustedOrigin);
-      if (origin.protocol === "https:") {
-        socialImage = new URL("/og.png", origin).toString();
-      }
-    } catch {
-      // The Worker does not supply malformed values. Keep a safe local fallback.
-    }
-  }
+  const socialImage = new URL("/og.png", metadataBaseFor()).toString();
 
   return {
     title: "DIG4EL — language documentation, made welcoming",
